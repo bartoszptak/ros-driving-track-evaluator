@@ -40,7 +40,7 @@ class TrackEval:
 
     def _main_func(self):
         while not self.finnish:
-            plt.pause(0.05)
+            #plt.pause(0.01)
             track = np.array(self.track)
             plt.scatter(track[:,0], track[:,1], c='b', s=1)
 

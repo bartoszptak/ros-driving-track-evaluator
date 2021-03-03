@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="ros-driving-track-evaluator" type="evaluator.py" name="evaluator_node" required="true" output="screen" />
+</launch>
+
