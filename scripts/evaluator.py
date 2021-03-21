@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import rospy
 import numpy as np
+import time
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from pyquaternion import Quaternion
+from scipy.ndimage.interpolation import rotate
+import scipy.interpolate as interp
 
 from fs_msgs.msg import Track
 from nav_msgs.msg import Odometry
@@ -18,6 +21,11 @@ class TrackEval:
         self.track = []
         self.actual_pose = None
         self.finnish = False
+        self.last_state = True
+        self.penelaties = []
+
+        self.tolerance = 1.0+float(rospy.get_param('~tolerance'))/100
+        self.visualize = bool(rospy.get_param('~visualize'))
 
         self.width = float(rospy.get_param('~car_width'))
         self.length = float(rospy.get_param('~car_length'))
@@ -29,8 +37,74 @@ class TrackEval:
         self._main_func()
 
     def track_callback(self, data: Track):
-        for cone in data.track:
-            self.track.append([cone.location.x, cone.location.y])
+        while self.actual_pose is None:
+            rospy.sleep(0.01)
+
+        for cone in data.track:           
+            self.track.append([cone.location.x, cone.location.y, cone.color])
+
+        self.track = np.array(self.track)
+        self.blue = self.track[self.track[:, 2]==0][:,:2]
+        self.yellow = self.track[self.track[:, 2]==1][:,:2]
+
+        self.track_width = (self.yellow-self.blue)/2
+
+        mask = self.yellow[:, 0]>self.blue[:, 0]
+
+        self.blue[:, 0][mask] -= self.track_width[:, 0][mask]
+        self.yellow[:, 0][mask] -= self.track_width[:, 0][mask]
+
+        self.blue[:, 0][~mask] += self.track_width[:, 0][~mask]
+        self.yellow[:, 0][~mask] += self.track_width[:, 0][~mask]
+
+        self.centers = self.blue+self.track_width
+        new_centers = np.empty((self.centers.shape[0]*2,2))
+        new_centers[::2] = self.centers
+        new_centers[1:-1:2] = self.centers[:-1] + (self.centers[1:]-self.centers[:-1])/2
+        new_centers[-1] = self.centers[-1] + (self.centers[0]-self.centers[-1])/2
+        self.centers = new_centers
+
+        new_track_width = np.empty((self.track_width.shape[0]*2,2))
+        new_track_width[::2] = self.track_width
+        new_track_width[1:-1:2] = self.track_width[:-1] + (self.track_width[1:]-self.track_width[:-1])/2
+        new_track_width[-1] = self.track_width[-1] + (self.track_width[0]-self.track_width[-1])/2
+        self.track_width = new_track_width
+
+    @staticmethod
+    def rotate(p, origin=(0, 0), degrees=0):
+        angle = np.deg2rad(degrees)
+        R = np.array([[np.cos(angle), -np.sin(angle)],
+                    [np.sin(angle),  np.cos(angle)]])
+        o = np.atleast_2d(origin)
+        p = np.atleast_2d(p)
+        return np.squeeze((R @ (p.T-o.T) + o.T).T)
+
+    def _get_car_model_points(self, x, y, angle):
+        c = np.array([x,y])
+
+        points = np.concatenate([
+            np.linspace(c+np.array([-self.length/2, -self.width/2]), c+np.array([self.length/2, -self.width/2]), 10),
+            np.linspace(c+np.array([self.length/2, -self.width/2]), c+np.array([self.length/2, self.width/2]), 10),
+            np.linspace(c+np.array([self.length/2, self.width/2]), c+np.array([-self.length/2, self.width/2]), 10),
+            np.linspace(c+np.array([-self.length/2, self.width/2]), c+np.array([-self.length/2, -self.width/2]), 10),
+        ], axis=0)
+
+        points = self.rotate(points, origin=c, degrees=angle)
+
+        return points
+
+    def check_in_track(self, car_points: np.ndarray):
+        val = np.apply_along_axis(lambda x: (np.linalg.norm(x[:2]-car_points, axis=1)<self.tolerance*np.hypot(*x[2:])).all(), axis=1, arr=np.concatenate([self.centers, self.track_width], axis=1)).any()
+
+        print(self.penelaties, val)
+
+        if val and not self.last_state:
+            self.penelaties[-1] = time.time()-self.penelaties[-1]
+        elif not val and self.last_state:
+            self.penelaties.append(time.time())
+
+        self.last_state = val
+
 
     def pose_callback(self, data: Odometry):
         self.actual_pose = data.pose.pose
@@ -39,16 +113,26 @@ class TrackEval:
     def finished_callback(self, data: FinishedSignal):
         if data:
             self.finish = True
-            rospy.loginfo('FINNISH signal received.')
+            if not self.last_state:
+                self.penelaties[-1] = time.time()-self.penelaties[-1]
 
+            rospy.loginfo('FINNISH signal received.')
+            print(self.penelaties)
+            rospy.signal_shutdown(0)
 
     def _main_func(self):
-        fig, ax = plt.subplots()
 
+        if self.visualize:        
+            fig, ax = plt.subplots(1, 2)
+            plt.ion()
         while not self.finnish:
-            plt.pause(0.01)
-            track = np.array(self.track)
-            ax.scatter(track[:,0], track[:,1], c='b', s=1)
+
+            if self.visualize:
+                plt.pause(0.01)
+                ax[0].clear()
+                ax[0].scatter(self.blue[:,0], self.blue[:,1], c='b', s=1)
+                ax[0].scatter(self.yellow[:,0], self.yellow[:,1], c='gold', s=1)
+                ax[0].scatter(self.centers[:,0], self.centers[:,1], c='red', s=1)
 
             if self.actual_pose:
 
@@ -58,14 +142,16 @@ class TrackEval:
                     self.actual_pose.orientation.y, 
                     self.actual_pose.orientation.z,
                     axis=[0,0,1])
-                theta = np.degrees(q.yaw_pitch_roll[0])
-                
-                rect = patches.Rectangle(
-                    (self.actual_pose.position.x-self.length/2, self.actual_pose.position.y-self.width/2), 
-                    self.length, self.width, angle=theta, 
-                    fill=True, edgecolor='r', facecolor='r')
-                ax.add_patch(rect)
+                theta = np.degrees(q.yaw_pitch_roll[0])+180
 
+                car_points = self._get_car_model_points(self.actual_pose.position.x, self.actual_pose.position.y, theta)
+                self.check_in_track(car_points)
+
+                if self.visualize:
+                    ax[0].scatter(car_points[:, 0], car_points[:, 1], c='g', s=1)
+                    ax[1].clear()
+                    ax[1].scatter(car_points[:, 0], car_points[:, 1], c='r', s=1)
+     
 
 if __name__ == '__main__':
     rospy.init_node('track_evaluator', anonymous=True)
