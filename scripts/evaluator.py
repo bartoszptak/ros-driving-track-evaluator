@@ -58,16 +58,20 @@ class TrackEval:
         self.yellow[:, 0][~mask] += self.track_width[:, 0][~mask]
 
         self.centers = self.blue+self.track_width
-        new_centers = np.empty((self.centers.shape[0]*2,2))
-        new_centers[::2] = self.centers
-        new_centers[1:-1:2] = self.centers[:-1] + (self.centers[1:]-self.centers[:-1])/2
-        new_centers[-1] = self.centers[-1] + (self.centers[0]-self.centers[-1])/2
+        new_centers = np.empty((self.centers.shape[0]*3,2))
+        new_centers[::3] = self.centers
+        new_centers[1:-2:3] = self.centers[:-1] + (self.centers[1:]-self.centers[:-1])/3
+        new_centers[2:-2:3] = self.centers[:-1] + (self.centers[1:]-self.centers[:-1])*2/3
+        new_centers[-2] = self.centers[-1] + (self.centers[0]-self.centers[-1])/3
+        new_centers[-1] = self.centers[-1] + (self.centers[0]-self.centers[-1])*2/3
         self.centers = new_centers
 
-        new_track_width = np.empty((self.track_width.shape[0]*2,2))
-        new_track_width[::2] = self.track_width
-        new_track_width[1:-1:2] = self.track_width[:-1] + (self.track_width[1:]-self.track_width[:-1])/2
-        new_track_width[-1] = self.track_width[-1] + (self.track_width[0]-self.track_width[-1])/2
+        new_track_width = np.empty((self.track_width.shape[0]*3,2))
+        new_track_width[::3] = self.track_width
+        new_track_width[1:-2:3] = self.track_width[:-1] + (self.track_width[1:]-self.track_width[:-1])/3
+        new_track_width[2:-2:3] = self.track_width[:-1] + (self.track_width[1:]-self.track_width[:-1])*2/3
+        new_track_width[-2] = self.track_width[-1] + (self.track_width[0]-self.track_width[-1])/3
+        new_track_width[-1] = self.track_width[-1] + (self.track_width[0]-self.track_width[-1])*2/3
         self.track_width = new_track_width
 
     @staticmethod
@@ -94,14 +98,14 @@ class TrackEval:
         return points
 
     def check_in_track(self, car_points: np.ndarray):
-        val = np.apply_along_axis(lambda x: (np.linalg.norm(x[:2]-car_points, axis=1)<self.tolerance*np.hypot(*x[2:])).all(), axis=1, arr=np.concatenate([self.centers, self.track_width], axis=1)).any()
-
-        print(self.penelaties, val)
+        val = np.apply_along_axis(lambda x: (np.linalg.norm(x[:2]-car_points, axis=1)<=self.tolerance*np.hypot(*x[2:])).all(), axis=1, arr=np.concatenate([self.centers, self.track_width], axis=1)).any()
 
         if val and not self.last_state:
             self.penelaties[-1] = time.time()-self.penelaties[-1]
+            print(f'[LOGS] Back to road! Penelaties: {self.penelaties[-1]}s')
         elif not val and self.last_state:
             self.penelaties.append(time.time())
+            print('[LOGS] Out of road!')
 
         self.last_state = val
 
@@ -117,22 +121,27 @@ class TrackEval:
                 self.penelaties[-1] = time.time()-self.penelaties[-1]
 
             rospy.loginfo('FINNISH signal received.')
-            print(self.penelaties)
+            print(f'Penelaties {np.sum(self.penelaties)}')
             rospy.signal_shutdown(0)
 
     def _main_func(self):
 
         if self.visualize:        
-            fig, ax = plt.subplots(1, 2)
+            fig, ax = plt.subplots(1, 1)
             plt.ion()
         while not self.finnish:
 
             if self.visualize:
                 plt.pause(0.01)
-                ax[0].clear()
-                ax[0].scatter(self.blue[:,0], self.blue[:,1], c='b', s=1)
-                ax[0].scatter(self.yellow[:,0], self.yellow[:,1], c='gold', s=1)
-                ax[0].scatter(self.centers[:,0], self.centers[:,1], c='red', s=1)
+                ax.clear()
+
+                for x in np.concatenate([self.centers, self.track_width], axis=1):
+                    circle = plt.Circle((x[0], x[1]), self.tolerance*np.hypot(*x[2:]), color='blue', fill=False)
+                    ax.add_patch(circle)
+
+                ax.scatter(self.blue[:,0], self.blue[:,1], c='b', s=1)
+                ax.scatter(self.yellow[:,0], self.yellow[:,1], c='gold', s=1)
+                ax.scatter(self.centers[:,0], self.centers[:,1], c='red', s=1)
 
             if self.actual_pose:
 
@@ -148,10 +157,8 @@ class TrackEval:
                 self.check_in_track(car_points)
 
                 if self.visualize:
-                    ax[0].scatter(car_points[:, 0], car_points[:, 1], c='g', s=1)
-                    ax[1].clear()
-                    ax[1].scatter(car_points[:, 0], car_points[:, 1], c='r', s=1)
-     
+                    ax.scatter(car_points[:, 0], car_points[:, 1], c='g', s=1)
+
 
 if __name__ == '__main__':
     rospy.init_node('track_evaluator', anonymous=True)
