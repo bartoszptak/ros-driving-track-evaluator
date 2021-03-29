@@ -8,7 +8,7 @@ project(ros-driving-track-evaluator)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  fs_msgs
+  av_msgs
   roscpp
   rospy
   std_msgs
@@ -71,7 +71,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
-#   fs_msgs#   std_msgs
+#   av_msgs#   std_msgs
 # )
 
 ################################################
@@ -104,7 +104,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  CATKIN_DEPENDS fs_msgs rospy
+  CATKIN_DEPENDS av_msgs rospy
 )
 
 ###########

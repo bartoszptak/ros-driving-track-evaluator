@@ -1,21 +1,18 @@
 <launch>
-    <arg name="track_topic" default="/fsds/testing_only/track"/>
-    <arg name="odom_topic" default="/fsds/testing_only/odom"/>
-    <arg name="go_signal" default="/fsds/signal/go"/>
-    <arg name="finished_signal" default="/fsds/signal/finished"/>
-    <arg name="car_width" default="1.0"/>
-    <arg name="car_length" default="1.8"/>
-    <arg name="tolerance" default="50"/> 
+    <arg name="odom_topic" default="/base_pose_ground_truth"/>
+    <arg name="go_signal" default="/prius/mode"/>
+    <arg name="car_width" default="1.7526"/>
+    <arg name="car_length" default="2.1"/>
+    <arg name="tolerance" default="8"/> 
     <arg name="visualize" default="False"/> 
 
     <node pkg="ros-driving-track-evaluator" type="evaluator.py" name="evaluator_node" required="true" output="screen">
-        <param name="track_topic" value="$(arg track_topic)"/>
         <param name="odom_topic" value="$(arg odom_topic)"/>
         <param name="go_signal" value="$(arg go_signal)"/>
-        <param name="finished_signal" value="$(arg finished_signal)"/>
         <param name="car_width" value="$(arg car_width)"/>
         <param name="car_length" value="$(arg car_length)"/>
         <param name="tolerance" value="$(arg tolerance)"/>
         <param name="visualize" value="$(arg visualize)"/>
+        <param name="world_path" value="$(find av)/worlds/custom.world"/>
     </node>
 </launch>
