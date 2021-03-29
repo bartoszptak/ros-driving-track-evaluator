@@ -35,3 +35,29 @@ source devel/setup.bash
 ```bash
 roslaunch ros-driving-track-evaluator run.launch
 ```
+
+# Info
+
+* Evaluator waits for autonomous mode to start by invoking topic:
+```ros
+rostopic pub --once /prius/mode av_msgs/Mode "header:
+  seq: 0
+  stamp:
+    secs: 0
+    nsecs: 0
+  frame_id: ''
+selfdriving: true
+collect: false"
+```
+
+* Terminate and display the penalty total when the standalone mode is terminated:
+```ros
+rostopic pub --once /prius/mode av_msgs/Mode "header:
+  seq: 0
+  stamp:
+    secs: 0
+    nsecs: 0
+  frame_id: ''
+selfdriving: false
+collect: false"
+```
