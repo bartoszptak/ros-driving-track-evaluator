@@ -1,0 +1,7 @@
+pyyaml
+rospkg
+numpy
+matplotlib
+pyquaternion
+scipy
+xmltodict
