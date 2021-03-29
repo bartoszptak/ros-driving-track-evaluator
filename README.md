@@ -50,7 +50,7 @@ selfdriving: true
 collect: false"
 ```
 
-* Terminate and display the penalty total when the standalone mode is terminated:
+* Terminate and display the penalty total when the selfdriving mode is terminated:
 ```ros
 rostopic pub --once /prius/mode av_msgs/Mode "header:
   seq: 0
