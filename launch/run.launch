@@ -5,6 +5,8 @@
     <arg name="car_length" default="2.1"/>
     <arg name="tolerance" default="8"/> 
     <arg name="visualize" default="False"/> 
+    <arg name="init_pose_x" default="100"/> 
+    <arg name="init_pose_y" default="100"/> 
 
     <node pkg="ros-driving-track-evaluator" type="evaluator.py" name="evaluator_node" required="true" output="screen">
         <param name="odom_topic" value="$(arg odom_topic)"/>
@@ -14,5 +16,7 @@
         <param name="tolerance" value="$(arg tolerance)"/>
         <param name="visualize" value="$(arg visualize)"/>
         <param name="world_path" value="$(find av)/worlds/custom.world"/>
+        <param name="init_pose_x" value="$(arg init_pose_x)"/>
+        <param name="init_pose_y" value="$(arg init_pose_y)"/>
     </node>
 </launch>
