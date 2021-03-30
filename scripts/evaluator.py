@@ -44,10 +44,12 @@ class TrackEval:
         self.width = float(rospy.get_param('~car_width'))
         self.length = float(rospy.get_param('~car_length'))
         self.tolerance = 1.0+float(rospy.get_param('~tolerance'))/100
+        self.finish_line = (float(rospy.get_param('~init_pose_x')), float(rospy.get_param('~init_pose_y')))
 
         self.last_state = True       
         self.is_start = False 
         self.penelaties = []
+        self.visited = np.zeros((self.points.shape[0]))
 
         rospy.loginfo('Evaluator started. Waiting for GO signal.')
 
@@ -55,6 +57,7 @@ class TrackEval:
             rospy.sleep(0.1)
 
         rospy.loginfo('GO signal received.')
+        self.total_time = time.time()
         self._main_func()
 
     @staticmethod
@@ -81,7 +84,10 @@ class TrackEval:
         return points
 
     def check_in_track(self, car_points):
-        val = np.apply_along_axis(lambda x: (np.linalg.norm(x[:2]-car_points, axis=1)<=self.tolerance*self.track_width).all(), axis=1, arr=self.points).any()
+        val = np.apply_along_axis(lambda x: (np.linalg.norm(x[:2]-car_points, axis=1)<=self.tolerance*self.track_width).all(), axis=1, arr=self.points)
+        self.visited[val]= True
+
+        val = val.any()
 
         if val and not self.last_state:
             self.penelaties[-1] = time.time()-self.penelaties[-1]
@@ -105,7 +111,13 @@ class TrackEval:
                     self.penelaties[-1] = time.time()-self.penelaties[-1]
 
                 rospy.loginfo('FINNISH signal received.')
-                print('Penelaties '+ str(np.sum(self.penelaties)))
+                print('Total time of run: '+str(time.time() - self.total_time)+'s')
+                print('Penelaties '+ str(np.sum(self.penelaties))+'s')
+                print('Percent of road: ' + str(np.round(np.sum(self.visited)/self.visited.shape[0]*100, 2)) + '%')
+
+                print('*'*10)
+                print('Total: '+ str(time.time() - self.total_time+np.sum(self.penelaties)) +'s')
+                print('*'*10)
                 rospy.signal_shutdown(0)
 
     def _main_func(self):
@@ -136,6 +148,12 @@ class TrackEval:
 
                 car_points = self._get_car_model_points(self.actual_pose.position.x, self.actual_pose.position.y, theta)
                 self.check_in_track(car_points)
+
+                if (self.finish_line[0]-2 < self.actual_pose.position.x < self.finish_line[0]-1) and (self.finish_line[1]-10 < self.actual_pose.position.y < self.finish_line[1]+10):
+                    m = Mode()
+                    m.selfdriving = False
+                    self.mode_callback(m)
+                    break
 
                 if self.visualize:  
                     ax.scatter(car_points[:, 0], car_points[:, 1], c='red', s=5)
