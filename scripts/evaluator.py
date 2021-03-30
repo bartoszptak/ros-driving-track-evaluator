@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import rospy
 import numpy as np
 import time
@@ -64,7 +64,7 @@ class TrackEval:
                     [np.sin(angle),  np.cos(angle)]])
         o = np.atleast_2d(origin)
         p = np.atleast_2d(p)
-        return np.squeeze((R @ (p.T-o.T) + o.T).T)
+        return np.squeeze((np.dot(R, (p.T-o.T)) + o.T).T)
 
     def _get_car_model_points(self, x, y, angle):
         c = np.array([x,y])
@@ -80,22 +80,22 @@ class TrackEval:
 
         return points
 
-    def check_in_track(self, car_points: np.ndarray):
+    def check_in_track(self, car_points):
         val = np.apply_along_axis(lambda x: (np.linalg.norm(x[:2]-car_points, axis=1)<=self.tolerance*self.track_width).all(), axis=1, arr=self.points).any()
 
         if val and not self.last_state:
             self.penelaties[-1] = time.time()-self.penelaties[-1]
-            print(f'[LOGS] Back to road! Penelaties: {self.penelaties[-1]}s')
+            print('[LOGS] Back to road! Penelaties: '+str(self.penelaties[-1])+'s')
         elif not val and self.last_state:
             self.penelaties.append(time.time())
             print('[LOGS] Out of road!')
 
         self.last_state = val
 
-    def pose_callback(self, data: Odometry):
+    def pose_callback(self, data):
         self.actual_pose = data.pose.pose
 
-    def mode_callback(self, data: Mode):
+    def mode_callback(self, data):
         if data:
             if data.selfdriving:
                 self.is_start = True
@@ -105,7 +105,7 @@ class TrackEval:
                     self.penelaties[-1] = time.time()-self.penelaties[-1]
 
                 rospy.loginfo('FINNISH signal received.')
-                print(f'Penelaties {np.sum(self.penelaties)}')
+                print('Penelaties '+ str(np.sum(self.penelaties)))
                 rospy.signal_shutdown(0)
 
     def _main_func(self):
