@@ -34,6 +34,7 @@ class TrackEval:
 
         go = rospy.wait_for_message(rospy.get_param('~go_signal'), GoSignal)
         rospy.loginfo('GO signal received.')
+        self.total_time = time.time()
         self._main_func()
 
     def track_callback(self, data: Track):
@@ -74,6 +75,8 @@ class TrackEval:
         new_track_width[-1] = self.track_width[-1] + (self.track_width[0]-self.track_width[-1])*2/3
         self.track_width = new_track_width
 
+        self.visited = np.zeros((self.centers.shape[0]))
+
     @staticmethod
     def rotate(p, origin=(0, 0), degrees=0):
         angle = np.deg2rad(degrees)
@@ -98,7 +101,10 @@ class TrackEval:
         return points
 
     def check_in_track(self, car_points: np.ndarray):
-        val = np.apply_along_axis(lambda x: (np.linalg.norm(x[:2]-car_points, axis=1)<=self.tolerance*np.hypot(*x[2:])).all(), axis=1, arr=np.concatenate([self.centers, self.track_width], axis=1)).any()
+        val = np.apply_along_axis(lambda x: (np.linalg.norm(x[:2]-car_points, axis=1)<=self.tolerance*np.hypot(*x[2:])).all(), axis=1, arr=np.concatenate([self.centers, self.track_width], axis=1))
+        self.visited[val]= True
+
+        val = val.any()
 
         if val and not self.last_state:
             self.penelaties[-1] = time.time()-self.penelaties[-1]
@@ -120,8 +126,16 @@ class TrackEval:
             if not self.last_state:
                 self.penelaties[-1] = time.time()-self.penelaties[-1]
 
+
+            track_time = time.time() - self.total_time
             rospy.loginfo('FINNISH signal received.')
-            print(f'Penelaties {np.sum(self.penelaties)}')
+            print('Total time of run: '+str(track_time)+'s')
+            print('Penelaties '+ str(np.sum(self.penelaties))+'s')
+            print('Percent of road: ' + str(np.round(np.sum(self.visited)/self.visited.shape[0]*100, 2)) + '%')
+
+            print('*'*10)
+            print('Total: '+ str(track_time+np.sum(self.penelaties)) +'s')
+            print('*'*10)
             rospy.signal_shutdown(0)
 
     def _main_func(self):
