@@ -8,21 +8,19 @@ from pyquaternion import Quaternion
 from scipy.ndimage.interpolation import rotate
 import scipy.interpolate as interp
 
-from fs_msgs.msg import Track
+from fs_msgs.msg import Track, ExtraInfo
 from nav_msgs.msg import Odometry
 from fs_msgs.msg import FinishedSignal, GoSignal
 
 class TrackEval:
     def __init__(self):
-        rospy.Subscriber(rospy.get_param('~track_topic'), Track, self.track_callback)
-        rospy.Subscriber(rospy.get_param('~odom_topic'), Odometry, self.pose_callback)
-        rospy.Subscriber(rospy.get_param('~finished_signal'), FinishedSignal, self.finished_callback)
-
         self.track = []
         self.actual_pose = None
         self.finnish = False
+        self.visited = None
         self.last_state = True
         self.penelaties = []
+        self.hit_cones = 0
 
         self.tolerance = 1.0+float(rospy.get_param('~tolerance'))/100
         self.visualize = bool(rospy.get_param('~visualize'))
@@ -30,12 +28,25 @@ class TrackEval:
         self.width = float(rospy.get_param('~car_width'))
         self.length = float(rospy.get_param('~car_length'))
 
+        self.finish_line = [4.0, 0.0]
+
+        rospy.Subscriber(rospy.get_param('~track_topic'), Track, self.track_callback)
+        rospy.Subscriber(rospy.get_param('~odom_topic'), Odometry, self.pose_callback)
+        rospy.Subscriber(rospy.get_param('~finished_signal'), FinishedSignal, self.finished_callback)
+        rospy.Subscriber('/fsds/testing_only/extra_info', ExtraInfo, self.hit_cones_callback)
+
+        while self.visited is None:
+            rospy.sleep(0.1)
+
         rospy.loginfo('Evaluator started. Waiting for GO signal.')
 
         go = rospy.wait_for_message(rospy.get_param('~go_signal'), GoSignal)
         rospy.loginfo('GO signal received.')
         self.total_time = time.time()
         self._main_func()
+
+    def hit_cones_callback(self, data):
+        self.hit_cones = data.doo_counter
 
     def track_callback(self, data: Track):
         while self.actual_pose is None:
@@ -130,7 +141,8 @@ class TrackEval:
             track_time = time.time() - self.total_time
             rospy.loginfo('FINNISH signal received.')
             print('Total time of run: '+str(track_time)+'s')
-            print('Penelaties '+ str(np.sum(self.penelaties))+'s')
+            print('Penelaties '+ str(np.sum(self.penelaties))+'s'+ ' ('+str(len(self.penelaties)) + ' x)')
+            print('Hitted cones: '+str(self.hit_cones))
             print('Percent of road: ' + str(np.round(np.sum(self.visited)/self.visited.shape[0]*100, 2)) + '%')
 
             print('*'*10)
@@ -169,6 +181,12 @@ class TrackEval:
 
                 car_points = self._get_car_model_points(self.actual_pose.position.x, self.actual_pose.position.y, theta)
                 self.check_in_track(car_points)
+
+                if (self.finish_line[0]-2 < self.actual_pose.position.x < self.finish_line[0]-1) and (self.finish_line[1]-10 < self.actual_pose.position.y < self.finish_line[1]+10):
+                    if (np.sum(self.visited)/self.visited.shape[0]) > 0.05:
+                        m = FinishedSignal()
+                        self.finished_callback(m)
+                        break
 
                 if self.visualize:
                     ax.scatter(car_points[:, 0], car_points[:, 1], c='g', s=1)
