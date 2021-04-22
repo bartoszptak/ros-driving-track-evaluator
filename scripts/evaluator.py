@@ -40,7 +40,7 @@ class TrackEval:
 
         rospy.loginfo('Evaluator started. Waiting for GO signal.')
 
-        # go = rospy.wait_for_message(rospy.get_param('~go_signal'), GoSignal)
+        go = rospy.wait_for_message(rospy.get_param('~go_signal'), GoSignal)
         rospy.loginfo('GO signal received.')
         self.total_time = time.time()
         self._main_func()
