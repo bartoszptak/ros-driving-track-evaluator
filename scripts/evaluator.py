@@ -40,7 +40,7 @@ class TrackEval:
 
         rospy.loginfo('Evaluator started. Waiting for GO signal.')
 
-        go = rospy.wait_for_message(rospy.get_param('~go_signal'), GoSignal)
+        # go = rospy.wait_for_message(rospy.get_param('~go_signal'), GoSignal)
         rospy.loginfo('GO signal received.')
         self.total_time = time.time()
         self._main_func()
@@ -140,14 +140,15 @@ class TrackEval:
 
             track_time = time.time() - self.total_time
             rospy.loginfo('FINNISH signal received.')
-            print('Total time of run: '+str(track_time)+'s')
-            print('Penelaties '+ str(np.sum(self.penelaties))+'s'+ ' ('+str(len(self.penelaties)) + ' x)')
-            print('Hitted cones: '+str(self.hit_cones))
-            print('Percent of road: ' + str(np.round(np.sum(self.visited)/self.visited.shape[0]*100, 2)) + '%')
+            print('*'*40)
 
-            print('*'*10)
-            print('Total: '+ str(track_time+np.sum(self.penelaties)) +'s')
-            print('*'*10)
+            print('* Time of run: '+str(np.round(track_time, 3))+'s')
+            print('* Out of road penelaties: '+ str(np.round(np.sum(self.penelaties), 3))+'s'+ ' ('+str(len(self.penelaties)) + ' x)')
+            print('* Hitted cones penelaties: '+ str(self.hit_cones*2.0)+'s'+ ' ('+str(self.hit_cones) + ' x)')
+            print('* Percent of road: ' + str(np.round(np.sum(self.visited)/self.visited.shape[0]*100, 2)) + '%')
+            print('*')
+            print('* Total: '+ str(np.round(track_time+np.sum(self.penelaties)+self.hit_cones*2.0, 3)) +'s')
+            print('*'*40)
             rospy.signal_shutdown(0)
 
     def _main_func(self):
