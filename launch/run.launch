@@ -5,7 +5,7 @@
     <arg name="finished_signal" default="/fsds/signal/finished"/>
     <arg name="car_width" default="1.0"/>
     <arg name="car_length" default="1.8"/>
-    <arg name="tolerance" default="50"/> 
+    <arg name="tolerance" default="100"/> 
     <arg name="visualize" default="False"/> 
 
     <node pkg="ros-driving-track-evaluator" type="evaluator.py" name="evaluator_node" required="true" output="screen">
