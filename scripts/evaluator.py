@@ -19,6 +19,7 @@ class TrackEval:
         self.finnish = False
         self.visited = None
         self.last_state = True
+        self.buffor = np.ones((50,), dtype=np.bool)
         self.penelaties = []
         self.hit_cones = 0
 
@@ -117,14 +118,15 @@ class TrackEval:
 
         val = val.any()
 
-        if val and not self.last_state:
+        if val and np.sum(self.buffor)==0:
             self.penelaties[-1] = time.time()-self.penelaties[-1]
-            print(f'[LOGS] Back to road! Penelaties: {self.penelaties[-1]}s')
-        elif not val and self.last_state:
+            print(f'[LOGS] Back to road!')
+        elif not val and np.sum(self.buffor)==50:
             self.penelaties.append(time.time())
-            print('[LOGS] Out of road!')
+            print('[LOGS] Out of road! Penelaties: 10s')
 
-        self.last_state = val
+        self.buffor[:49] = self.buffor[1:]
+        self.buffor[-1] = val
 
 
     def pose_callback(self, data: Odometry):
@@ -143,7 +145,7 @@ class TrackEval:
             print('*'*40)
 
             print('* Time of run: '+str(np.round(track_time, 3))+'s')
-            print('* Out of road penelaties: '+ str(np.round(np.sum(self.penelaties), 3))+'s'+ ' ('+str(len(self.penelaties)) + ' x)')
+            print('* Out of road penelaties: '+ str(len(self.penelaties)*10.0)+'s'+ ' ('+str(len(self.penelaties)) + ' x)')
             print('* Hitted cones penelaties: '+ str(self.hit_cones*2.0)+'s'+ ' ('+str(self.hit_cones) + ' x)')
             print('* Percent of road: ' + str(np.round(np.sum(self.visited)/self.visited.shape[0]*100, 2)) + '%')
             print('*')
@@ -171,6 +173,7 @@ class TrackEval:
                 ax.scatter(self.centers[:,0], self.centers[:,1], c='red', s=1)
 
             if self.actual_pose:
+                # print(self.actual_pose)
 
                 q = Quaternion(
                     self.actual_pose.orientation.w, 
